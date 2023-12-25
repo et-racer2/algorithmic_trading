@@ -27,8 +27,8 @@ def save_sp500_tickers():
         ticker = row.findAll('td')[0].text
         tickers.append(ticker.strip())
         i=i+1
-        if i > 10:
-          break
+        #if i > 10:
+        #  break
     return tickers
 
 #def writefile(input):
@@ -78,11 +78,15 @@ def get_targets(stock,days_forward):
     from datetime import datetime
     
     global targetdf
+    df3 = pd.DataFrame()
     
     str_d1 = dt.date.today().strftime('%Y-%m-%d')
-    tick = yf3.Ticker(stock)
-    df3 = pd.DataFrame()
-    df3 = tick.earnings_dates
+    try: 
+        tick = yf3.Ticker(stock)
+        df3 = tick.earnings_dates
+    except:
+        pass
+        print("Exception Occurred")
     i = 0
     #print(df3)
      # Create an empty DataFrame
@@ -96,7 +100,7 @@ def get_targets(stock,days_forward):
       #earndelta = get_delta_days(datetime.strptime(str_d2, "%Y-%m-%d"),)
       IsEstimateNan = math.isnan(earnrow['EPS Estimate'])
       earndate = index.strftime('%Y-%m-%d')
-      if (IsEstimateNan == False and delta.days > 0 and delta.days < 60):
+      if (IsEstimateNan == False and delta.days > 0 and delta.days < 30):
         new_row = {'Ticker':stock, 'Date':str_d2, 'Delta':delta.days, 'Est':earnrow['EPS Estimate'],'Rep':earnrow['Reported EPS'],'Surprise':earnrow['Surprise(%)']}
        
         targetdf.loc[len(targetdf)] = new_row
@@ -129,6 +133,7 @@ def get_next_earnings_date(stock):
     file3 = open('/Users/tarikessawi/data/targets.csv', 'a')  
     
     date_now = tm.strftime('%Y-%m-%d')
+    df3 = df3.round(2)
     for index, earnrow in df3.iterrows():
       str_d2 = index.strftime('%Y-%m-%d')
       delta = datetime.strptime(str_d2, "%Y-%m-%d") - datetime.strptime(str_d1, "%Y-%m-%d")
@@ -136,8 +141,8 @@ def get_next_earnings_date(stock):
       IsEstimateNan = math.isnan(earnrow['EPS Estimate'])
       earndate = index.strftime('%Y-%m-%d')
       if (IsEstimateNan == False and delta.days < 0):  
-            backdate = get_dates_back(earndate,5)
-            aheaddate = get_dates_ahead(earndate,5)
+            backdate = get_dates_back(earndate,15)
+            aheaddate = get_dates_ahead(earndate,30)
             writeline = stock,str_d2,delta.days,earnrow['EPS Estimate'],earnrow['Reported EPS'],earnrow['Surprise(%)']
             #print(writeline)
             file2.write(f"{str_d2},{stock},{earnrow['EPS Estimate']},{earnrow['Reported EPS']},{earnrow['Surprise(%)']}\n")
@@ -171,14 +176,26 @@ def get_next_earnings_date(stock):
 def joindatasets():
   spdf = pd.read_csv('/Users/tarikessawi/data/stockprices.csv')
   eddf = pd.read_csv('/Users/tarikessawi/data/earnings.csv')
+  tgdf = pd.read_csv('/Users/tarikessawi/data/targets.csv')
+  
+  tgdf = tgdf.drop_duplicates()
+  eddf = eddf.drop_duplicates()
+  
   combineddf = pd.merge(spdf, eddf, on=['Date','Ticker'], how = "outer")
+  combineddf = combineddf.drop_duplicates()
+  
+  combineddf = combineddf.round(2)
   
   os.makedirs('/Users/tarikessawi/data/', exist_ok=True)  
+  
   combineddf.to_csv('/Users/tarikessawi/data/combineddf.csv')  
-  print(combineddf)
-
-def main():
+  eddf.to_csv('/Users/tarikessawi/data/earnings.csv')
+  tgdf.to_csv('/Users/tarikessawi/data/targets.csv')
+  
+  
+def main():        
     global targetdf
+    badlist = ['BRK.B','BF.B','FOX','NWS']
     
     file = open('/Users/tarikessawi/data/stockprices.csv', 'w') 
     file.write(f"Date,Ticker,close,adjclose,days \n")
@@ -196,21 +213,23 @@ def main():
     for row in tickers:
         row = row.strip()
         i = i+1
-        try:
-            get_targets(row,35)
-        except:
-            AssertionError
+        if (row not in badlist):
+            try:
+                get_targets(row,35)
+            except:
+                pass
+                print("AssertionError")
     
     targetdf.sort_values(by='Delta', inplace=True)
     targetdf.to_csv('/Users/tarikessawi/data/targets.csv')
     
     for index,targetrow in targetdf.iterrows():
       for row in targetrow:
-        #print(index)
-        try:
-            get_next_earnings_date(targetrow['Ticker'])
-        except:
-            AssertionError
+        if (targetrow['Ticker'] not in badlist):
+            try:
+                get_next_earnings_date(targetrow['Ticker'])
+            except:
+                pass
     #print(targetdf)
     
     file.close()
