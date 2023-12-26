@@ -27,8 +27,8 @@ def save_sp500_tickers():
         ticker = row.findAll('td')[0].text
         tickers.append(ticker.strip())
         i=i+1
-        #if i > 10:
-        #  break
+        if i > 500:
+          break
     return tickers
 
 #def writefile(input):
@@ -66,11 +66,9 @@ def process_stockprice(stockdf,earndate):
   #print("here")
   file = open('/Users/tarikessawi/data/stockprices.csv', 'a')  
   for index, pricerow in stockdf.iterrows():
+    key = earndate.strftime('%Y-%m-%d')+"-"+pricerow['ticker']
     delta_from_earn = get_delta_days(earndate,index)
-    file.write(f"{index.strftime('%Y-%m-%d')},{pricerow['ticker']},{pricerow['close']},{pricerow['adjclose'] },{delta_from_earn.days} \n")
-
-    #print(delta_from_earn)        
-    #writeline = index,ticker, pricerow['close'], pricerow['close']
+    file.write(f"{key},{index.strftime('%Y-%m')},{index.strftime('%Y-%m-%d')},{pricerow['ticker']},{pricerow['close']},{pricerow['adjclose'] },{delta_from_earn.days} \n")
    
 def get_targets(stock,days_forward):
     import csv
@@ -81,39 +79,30 @@ def get_targets(stock,days_forward):
     df3 = pd.DataFrame()
     
     str_d1 = dt.date.today().strftime('%Y-%m-%d')
-    try: 
-        tick = yf3.Ticker(stock)
-        df3 = tick.earnings_dates
-    except:
-        pass
-        print("Exception Occurred")
+    
+    tick = yf3.Ticker(stock)
+    try:
+      df3 = tick.earnings_dates
+      
+    except KeyError:
+      pass
+      print(f"Column does not exist in the DataFrame - {stock}")
+    except Exception:
+      pass
+      print(f"Catchall - {stock}")   
+
     i = 0
-    #print(df3)
-     # Create an empty DataFrame
-    
-    #file3 = open('/Users/tarikessawi/data/targets.csv', 'a')  
-    
     date_now = tm.strftime('%Y-%m-%d')
     for index, earnrow in df3.iterrows():
       str_d2 = index.strftime('%Y-%m-%d')
       delta = datetime.strptime(str_d2, "%Y-%m-%d") - datetime.strptime(str_d1, "%Y-%m-%d")
-      #earndelta = get_delta_days(datetime.strptime(str_d2, "%Y-%m-%d"),)
       IsEstimateNan = math.isnan(earnrow['EPS Estimate'])
       earndate = index.strftime('%Y-%m-%d')
       if (IsEstimateNan == False and delta.days > 0 and delta.days < 30):
         new_row = {'Ticker':stock, 'Date':str_d2, 'Delta':delta.days, 'Est':earnrow['EPS Estimate'],'Rep':earnrow['Reported EPS'],'Surprise':earnrow['Surprise(%)']}
-       
         targetdf.loc[len(targetdf)] = new_row
 
-        #targetdf = df.append(new_row, ignore_index=True)
         
-        #pd.DataFrame([{'Ticker':stock, 'Date':e, 'Delta':delta.days, 'Est':earnrow['EPS Estimate'],'Rep':earnrow['Reported EPS'],'Surprise':earnrow['Surprise(%)']}, columns=['Ticker', 'Date', 'Delta','Est','Rep','Suprise'])
-        #df = pd.DataFrame(columns=['Ticker', 'Date', 'Delta','Est','Rep','Suprise'])
-
-        #print(f"{writeline}\n")
-        #file3.write(f"{stock},{str_d2},{delta.days},{earnrow['EPS Estimate']},{earnrow['Reported EPS']},{earnrow['Surprise(%)']}\n")
-        #targetdf = pd.concat([targetdf,earnrow])
-    
     
 def get_next_earnings_date(stock):
     import csv
@@ -122,10 +111,15 @@ def get_next_earnings_date(stock):
     
     
     str_d1 = dt.date.today().strftime('%Y-%m-%d')
-    tick = yf3.Ticker(stock)
     
-    df3 = pd.DataFrame()
-    df3 = tick.earnings_dates
+    try:
+      tick = yf3.Ticker(stock)
+      df3 = pd.DataFrame()
+      df3 = tick.earnings_dates
+    except:
+      pass
+        
+    
     i = 0
     #print(df3)
 
@@ -137,42 +131,19 @@ def get_next_earnings_date(stock):
     for index, earnrow in df3.iterrows():
       str_d2 = index.strftime('%Y-%m-%d')
       delta = datetime.strptime(str_d2, "%Y-%m-%d") - datetime.strptime(str_d1, "%Y-%m-%d")
-      #earndelta = get_delta_days(datetime.strptime(str_d2, "%Y-%m-%d"),)
       IsEstimateNan = math.isnan(earnrow['EPS Estimate'])
       earndate = index.strftime('%Y-%m-%d')
       if (IsEstimateNan == False and delta.days < 0):  
             backdate = get_dates_back(earndate,15)
             aheaddate = get_dates_ahead(earndate,30)
             writeline = stock,str_d2,delta.days,earnrow['EPS Estimate'],earnrow['Reported EPS'],earnrow['Surprise(%)']
-            #print(writeline)
             file2.write(f"{str_d2},{stock},{earnrow['EPS Estimate']},{earnrow['Reported EPS']},{earnrow['Surprise(%)']}\n")
             temp_df = yf.get_data(stock.strip(),start_date=backdate,end_date=aheaddate,interval='1d')
-            #histpricedf = pd.concat([histpricedf,temp_df])
             process_stockprice(temp_df,index)
-            #print(temp_df)
-            #print(f"{writeline}")
-            #temp_df = yf.get_data(stock.strip(),start_date=earndate,end_date=aheaddate,interval='1d')
-            #process_stockprice(temp_df)
+            
       else:
             pass
-            #print("To Far into the future")
-
-            #backdate = date_3_days_back
-            #aheaddate = date_now
-
-            #print(f"get-back {get_dates_back(earndate,5)}")
-            #print("get-ahead "+get_dates_ahead(earndate,5))
-
-            #temp_df = yf.get_data(stock.strip(),start_date='2024-10-17',end_date=aheaddate,interval='1d')
-            #print(temp_df)
-
-            #print(datetime.strptime(get_dates_ahead(earndate,5), "%Y/%m/%d"))
-            #file.write(f"{stock},{str_d2},{delta.days},{earnrow['EPS Estimate']},{earnrow['Reported EPS']},{earnrow['Surprise(%)']}\n")
-            #file.close
-
-
-            #get_next_earnings_date2('MMM') 
-    #print(histpricedf)
+            
 def joindatasets():
   spdf = pd.read_csv('/Users/tarikessawi/data/stockprices.csv')
   eddf = pd.read_csv('/Users/tarikessawi/data/earnings.csv')
@@ -198,7 +169,7 @@ def main():
     badlist = ['BRK.B','BF.B','FOX','NWS']
     
     file = open('/Users/tarikessawi/data/stockprices.csv', 'w') 
-    file.write(f"Date,Ticker,close,adjclose,days \n")
+    file.write(f"Key,Yearm,Date,Ticker,close,adjclose,days \n")
     
     file2 = open('/Users/tarikessawi/data/earnings.csv', 'w')  
     file2.write(f"Date,Ticker,Est,Rep,Surprise \n")
@@ -215,7 +186,7 @@ def main():
         i = i+1
         if (row not in badlist):
             try:
-                get_targets(row,35)
+                get_targets(row,30)
             except:
                 pass
                 print("AssertionError")
