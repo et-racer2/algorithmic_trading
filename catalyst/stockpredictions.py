@@ -116,9 +116,7 @@ def get_next_earnings_date(stock):
       tick = yf3.Ticker(stock)
       df3 = pd.DataFrame()
       df3 = tick.earnings_dates
-    except:
-      pass
-        
+    F
     
     i = 0
     #print(df3)
