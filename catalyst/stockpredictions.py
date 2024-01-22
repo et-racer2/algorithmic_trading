@@ -18,6 +18,7 @@ targetdf = pd.DataFrame(columns=['Date', 'Ticker', 'Delta','Est','Rep','Suprise'
 def save_sp500_tickers():
     import requests
     import bs4 as bs
+    
     resp = requests.get('http://en.wikipedia.org/wiki/List_of_S%26P_500_companies')
     soup = bs.BeautifulSoup(resp.text, 'lxml')
     table = soup.find('table', {'class': 'wikitable sortable'})
@@ -83,7 +84,6 @@ def get_targets(stock,days_forward):
     tick = yf3.Ticker(stock)
     try:
       df3 = tick.earnings_dates
-      
     except KeyError:
       pass
       print(f"Column does not exist in the DataFrame - {stock}")
@@ -98,9 +98,10 @@ def get_targets(stock,days_forward):
       delta = datetime.strptime(str_d2, "%Y-%m-%d") - datetime.strptime(str_d1, "%Y-%m-%d")
       IsEstimateNan = math.isnan(earnrow['EPS Estimate'])
       earndate = index.strftime('%Y-%m-%d')
-      if (IsEstimateNan == False and delta.days > 0 and delta.days < 30):
+      if (IsEstimateNan == False and delta.days > 0 and delta.days < 5):
         new_row = {'Ticker':stock, 'Date':str_d2, 'Delta':delta.days, 'Est':earnrow['EPS Estimate'],'Rep':earnrow['Reported EPS'],'Surprise':earnrow['Surprise(%)']}
         targetdf.loc[len(targetdf)] = new_row
+        #print(new_row)
 
         
     
@@ -110,13 +111,15 @@ def get_next_earnings_date(stock):
     from datetime import datetime
     
     
-    str_d1 = dt.date.today().strftime('%Y-%m-%d')
+    
     
     try:
       tick = yf3.Ticker(stock)
       df3 = pd.DataFrame()
       df3 = tick.earnings_dates
-    F
+    except:
+        pass
+        print("Exception Occurred")
     
     i = 0
     #print(df3)
@@ -124,6 +127,9 @@ def get_next_earnings_date(stock):
     file2 = open('/Users/tarikessawi/data/earnings.csv', 'a')  
     file3 = open('/Users/tarikessawi/data/targets.csv', 'a')  
     
+    
+    
+    str_d1 = dt.date.today().strftime('%Y-%m-%d')
     date_now = tm.strftime('%Y-%m-%d')
     df3 = df3.round(2)
     for index, earnrow in df3.iterrows():
@@ -131,9 +137,10 @@ def get_next_earnings_date(stock):
       delta = datetime.strptime(str_d2, "%Y-%m-%d") - datetime.strptime(str_d1, "%Y-%m-%d")
       IsEstimateNan = math.isnan(earnrow['EPS Estimate'])
       earndate = index.strftime('%Y-%m-%d')
+      #print(f"delta days is {delta.days}")
       if (IsEstimateNan == False and delta.days < 0):  
             backdate = get_dates_back(earndate,15)
-            aheaddate = get_dates_ahead(earndate,30)
+            aheaddate = get_dates_ahead(earndate,15)
             writeline = stock,str_d2,delta.days,earnrow['EPS Estimate'],earnrow['Reported EPS'],earnrow['Surprise(%)']
             file2.write(f"{str_d2},{stock},{earnrow['EPS Estimate']},{earnrow['Reported EPS']},{earnrow['Surprise(%)']}\n")
             temp_df = yf.get_data(stock.strip(),start_date=backdate,end_date=aheaddate,interval='1d')
@@ -147,19 +154,22 @@ def joindatasets():
   eddf = pd.read_csv('/Users/tarikessawi/data/earnings.csv')
   tgdf = pd.read_csv('/Users/tarikessawi/data/targets.csv')
   
-  tgdf = tgdf.drop_duplicates()
-  eddf = eddf.drop_duplicates()
+  #tgdf = tgdf.drop_duplicates(inplace=True)
+  eddf.drop_duplicates(inplace=True)
+  spdf.drop_duplicates(inplace=True)
   
+  combineddf = pd.DataFrame()
+
   combineddf = pd.merge(spdf, eddf, on=['Date','Ticker'], how = "outer")
-  combineddf = combineddf.drop_duplicates()
+  combineddf.drop_duplicates(inplace=True)
   
   combineddf = combineddf.round(2)
   
   os.makedirs('/Users/tarikessawi/data/', exist_ok=True)  
   
   combineddf.to_csv('/Users/tarikessawi/data/combineddf.csv')  
-  eddf.to_csv('/Users/tarikessawi/data/earnings.csv')
-  tgdf.to_csv('/Users/tarikessawi/data/targets.csv')
+  #eddf.to_csv('/Users/tarikessawi/data/earnings.csv')
+  #tgdf.to_csv('/Users/tarikessawi/data/targets.csv')
   
   
 def main():        
@@ -174,7 +184,7 @@ def main():
     
     #file3 = open('/Users/tarikessawi/data/targets.csv', 'w')  
     #file3.write(f"Date,Ticker,Delta,Est,Rep,Surprise \n")
-    
+    print('Starting')
     tickers = save_sp500_tickers()
     #df = pd.DataFrame()
     #temp_df = pd.DataFrame()
@@ -189,8 +199,10 @@ def main():
                 pass
                 print("AssertionError")
     
+    targetdf.drop_duplicates(inplace=True)
     targetdf.sort_values(by='Delta', inplace=True)
     targetdf.to_csv('/Users/tarikessawi/data/targets.csv')
+    
     
     for index,targetrow in targetdf.iterrows():
       for row in targetrow:
@@ -199,7 +211,6 @@ def main():
                 get_next_earnings_date(targetrow['Ticker'])
             except:
                 pass
-    #print(targetdf)
     
     file.close()
     file2.close()
